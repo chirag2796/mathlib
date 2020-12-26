@@ -7,6 +7,7 @@ import data.rat
 import data.fintype.card
 import data.nat.choose.binomial
 import algebra.big_operators.nat_antidiagonal
+import ring_theory.power_series.well_known
 
 /-!
 # Bernoulli numbers
@@ -54,10 +55,6 @@ two conventions for Bernoulli numbers. Lean's `bernoulli (n : ℕ) : ℚ` is the
 convention denoted $$B_n^+$$ on Wikipedia.  `n`'th
 Bernoulli number.
 
-For example, they show up in the Taylor series of many trigonometric and hyperbolic functions,
-and also as (integral multiples of products of powers of `π` and)
-special values of the Riemann zeta function.
-(Note: these facts are not yet available in mathlib)
 
 In this file, we provide the definition,
 and the basic fact (`sum_bernoulli`) that
@@ -129,23 +126,7 @@ begin
   convert sum_range_succ_eq_sum_antidiagonal (λ i j, (i.binomial j : ℚ) / (j + 1) * bernoulli i) n,
 end
 
-@[simp] lemma bernoulli_zero  : bernoulli 0 = 1   := rfl
-@[simp] lemma bernoulli_one   : bernoulli 1 = 1/2 :=
-begin
-  rw [bernoulli_def, sum_range_one], norm_num
-end
-@[simp] lemma bernoulli_two   : bernoulli 2 = 1/6 :=
-begin
-  rw [bernoulli_def, sum_range_succ, sum_range_one], norm_num
-end
-@[simp] lemma bernoulli_three : bernoulli 3 = 0   :=
-begin
-  rw [bernoulli_def, sum_range_succ, sum_range_succ, sum_range_one], norm_num,
-end
-@[simp] lemma bernoulli_four  : bernoulli 4 = -1/30 :=
-begin
-  rw [bernoulli_def, sum_range_succ, sum_range_succ, sum_range_succ, sum_range_one], norm_num,
-end
+
 
 open_locale nat
 
@@ -158,6 +139,9 @@ begin
 end
 
 open nat
+
+
+
 
 @[simp] lemma sum_bernoulli' (n : ℕ) :
   ∑ k in finset.range n, (k.binomial (n - k) : ℚ) * bernoulli k = n :=
@@ -177,5 +161,104 @@ begin
   field_simp [(show (j : ℚ) + 1 ≠ 0, from ne_of_gt (by norm_cast; linarith))],
   norm_cast,
   rw succ_mul_binomial',
+  ring,
+end
+
+-- Is this the way to say it?
+-- the "missing term" (n+1).binomial 0 * bernoulli (n+1) is B_{n+1}
+@[simp] lemma sum_bernoulli_antidiag (n : ℕ) :
+  (∑ ij in finset.nat.antidiagonal n,
+   (ij.1.binomial ij.2.succ : ℚ) * bernoulli ij.1) = n.succ :=
+begin
+  rw ← sum_range_succ_eq_sum_antidiagonal (λ (i j : ℕ) , (i.binomial j.succ : ℚ) * bernoulli i),
+  dsimp,
+  convert sum_bernoulli' n.succ using 1,
+  apply finset.sum_congr rfl,
+  intros k hk,
+  rw mem_range_succ_iff at hk,
+  congr',
+  exact (nat.succ_sub hk).symm,
+end
+
+
+/-
+
+# Examples
+
+-/
+
+
+@[simp] lemma bernoulli_zero  : bernoulli 0 = 1   := rfl
+
+-- a rival `bernoulli_neg` convention has this as -1/2 and all other ones the same
+
+@[simp] lemma bernoulli_one   : bernoulli 1 = 1/2 :=
+begin
+  rw [bernoulli_def, sum_range_one], norm_num
+end
+@[simp] lemma bernoulli_two   : bernoulli 2 = 1/6 :=
+begin
+  rw [bernoulli_def, sum_range_succ, sum_range_one], norm_num
+end
+@[simp] lemma bernoulli_three : bernoulli 3 = 0   :=
+begin
+  rw [bernoulli_def, sum_range_succ, sum_range_succ, sum_range_one], norm_num,
+end
+@[simp] lemma bernoulli_four  : bernoulli 4 = -1/30 :=
+begin
+  rw [bernoulli_def, sum_range_succ, sum_range_succ, sum_range_succ, sum_range_one], norm_num,
+end
+
+-- experiments
+
+--$$\sum B_n\frac{t^n}{n!}=\frac{t}{1-e^{-t}}$$
+
+open power_series
+
+@[simp] lemma constant_coeff_exp : constant_coeff ℚ (exp ℚ) = 1 := rfl
+
+lemma algebra_map_rat_subsingleton (R : Type*) [semiring R] [algebra ℚ R] : subsingleton (ℚ →+* R) :=
+by apply_instance
+
+def f : ℚ →+* ℚ := by refine_struct { to_fun := id}; tidy
+
+theorem thing (q : ℚ) : algebra_map ℚ ℚ q = q :=
+begin
+  rw show algebra_map ℚ ℚ = f, by simp,
+  refl,
+end
+
+theorem bernoulli_power_series :
+(power_series.mk (λ n, bernoulli n / n!) : power_series ℚ) * (power_series.exp ℚ - 1) =
+  (X : power_series ℚ) * exp ℚ :=
+begin
+  ext n,
+  cases n, simp only [ring_hom.map_sub, constant_coeff_one, zero_mul, constant_coeff_exp, constant_coeff_X, coeff_zero_eq_constant_coeff,
+  mul_zero, sub_self, ring_hom.map_mul],
+  rw coeff_mul,
+  /-
+  @[simp] lemma coeff_succ_mul_X (n : ℕ) (φ : power_series R) :
+  coeff R (n+1) (φ * X) = coeff R n φ :=
+  -/
+  rw mul_comm X,
+  rw coeff_succ_mul_X,
+  simp only [coeff_mk, coeff_one, coeff_exp, linear_map.map_sub, factorial, thing],
+  rw nat.sum_antidiagonal_succ',
+  simp, --squeeze_simp hangs
+  apply eq_inv_of_mul_left_eq_one,
+  rw sum_mul,
+  convert bernoulli_spec' n using 1,
+  apply sum_congr rfl,
+  rintro ⟨i, j⟩ hn, rw nat.mem_antidiagonal at hn, subst hn, dsimp only,
+  have hj : (j : ℚ) + 1 ≠ 0, by norm_cast; linarith,
+  have hj' : j.succ ≠ 0, by {show j + 1 ≠ 0, by linarith},
+  have haargh : ((j : ℚ) + 1) * j! * i! ≠ 0 := by norm_cast; exact
+    mul_ne_zero (mul_ne_zero hj' (factorial_ne_zero j)) (factorial_ne_zero _),
+  field_simp [hj, haargh],
+  norm_cast,
+  rw [mul_comm _ (bernoulli i), mul_assoc, mul_assoc],
+  apply congr_arg,
+  norm_cast,
+  rw ← binomial_spec,
   ring,
 end
