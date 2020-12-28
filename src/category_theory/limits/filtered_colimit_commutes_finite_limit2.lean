@@ -20,7 +20,7 @@ colimit (over `K`) of the limits (over `J`) with the limit of the colimits is an
 * [Stacks: Filtered colimits](https://stacks.math.columbia.edu/tag/002W)
 -/
 
-universes w₁ w₂ v u
+universes w₁ w₂ v₁ v₂ u
 
 open category_theory
 open category_theory.category
@@ -29,10 +29,9 @@ open category_theory.limits.types.filtered_colimit
 
 namespace category_theory.limits
 
-variables {J K : Type v} [category.{w₁} J] [category.{w₂} K]
-variables {C : Type u} [category.{v} C]
+variables {J : Type v₁} {K : Type v₂} [category.{w₁} J] [category.{w₂} K]
 
-variables {F : J ⥤ K ⥤ Type v}
+variables {F : J ⥤ K ⥤ Type v₁}
 
 variables {cj : Π (j : J), cone (F.obj j)}
 variables {ck : Π (k : K), cocone (F.flip.obj k)}
@@ -46,9 +45,9 @@ variables [is_filtered K]
 
 section
 
--- def filtered_colimit_finite_limit_iso : c₁.X ≅ c₂.X :=
--- { hom := colimit_to_limit tj tk t₁ t₂,
---   inv := sorry }
+def filtered_colimit_finite_limit_iso : c₁.X ≅ c₂.X :=
+{ hom := colimit_to_limit tj tk t₁ t₂,
+  inv := sorry }
 
 end
 
