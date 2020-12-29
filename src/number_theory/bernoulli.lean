@@ -228,18 +228,17 @@ begin
   refl,
 end
 
+#check power_series.coeff_mul
+
 theorem bernoulli_power_series :
 (power_series.mk (λ n, bernoulli n / n!) : power_series ℚ) * (power_series.exp ℚ - 1) =
   (X : power_series ℚ) * exp ℚ :=
 begin
   ext n,
+  -- constant coefficient is a special case
   cases n, simp only [ring_hom.map_sub, constant_coeff_one, zero_mul, constant_coeff_exp, constant_coeff_X, coeff_zero_eq_constant_coeff,
   mul_zero, sub_self, ring_hom.map_mul],
   rw coeff_mul,
-  /-
-  @[simp] lemma coeff_succ_mul_X (n : ℕ) (φ : power_series R) :
-  coeff R (n+1) (φ * X) = coeff R n φ :=
-  -/
   rw mul_comm X,
   rw coeff_succ_mul_X,
   simp only [coeff_mk, coeff_one, coeff_exp, linear_map.map_sub, factorial, thing],
