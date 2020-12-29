@@ -83,16 +83,19 @@ lemma bernoulli_spec (n : ℕ) :
   ∑ k in finset.range n.succ, (n.choose k : ℚ) / (n - k + 1) * bernoulli k = 1 :=
 by simp [finset.sum_range_succ, bernoulli_def n]
 
+-- branch mem_range_succ_iff -- did it compile or shall I unsimp?
 #check finset.mem_range
 @[simp] lemma finset.mem_range_succ_iff {a b : ℕ} : a ∈ finset.range b.succ ↔ a ≤ b :=
 by simp only [nat.lt_succ_iff, finset.mem_range]
 
 open finset
 
-lemma sum_range_succ_eq_sum_antidiagonal {M : Type*} [add_comm_monoid M]
-  (f : ℕ → ℕ → M) (n : ℕ) : ∑ k in range n.succ, f k (n - k) =
-    ∑ ij in finset.nat.antidiagonal n, f ij.1 ij.2 :=
+-- move out of this PR
+
+lemma sum_range_succ_eq_sum_antidiagonal {M : Type*} [add_comm_monoid M] (f : ℕ → ℕ → M) (n : ℕ) :
+  ∑ ij in finset.nat.antidiagonal n, f ij.1 ij.2 = ∑ k in range n.succ, f k (n - k) :=
 begin
+  symmetry,
   refine finset.sum_bij'
   (λ a _, (a, n - a) : Π (a : ℕ), a ∈ finset.range n.succ → ℕ × ℕ)
   _ (by simp)
@@ -103,48 +106,50 @@ begin
   { rintro ⟨i, j⟩ ha, ext, refl, rw ← (nat.mem_antidiagonal.1 ha), exact nat.add_sub_cancel_left _ _ },
 end
 
-lemma this_is_so_stupid (n : ℕ) :
-∑ (k : ℕ) in range n.succ, (k.binomial (n - k) : ℚ) / (n - k + 1) * bernoulli k
-=
-∑ (k : ℕ) in range n.succ, k.binomial (n - k) / ((n - k : ℕ) + 1) * bernoulli k
-:=
-begin
-  apply finset.sum_congr rfl,
-  intros k hk,
--- next line was written with
---  congr', symmetry, apply nat.cast_sub, library_search,
-  rw nat.cast_sub (finset.mem_range_succ_iff.mp hk),
-end
+-- hopefully don't need
+
+-- lemma this_is_so_stupid (n : ℕ) :
+-- ∑ (k : ℕ) in range n.succ, (k.binomial (n - k) : ℚ) / (n - k + 1) * bernoulli k
+-- =
+-- ∑ (k : ℕ) in range n.succ, k.binomial (n - k) / ((n - k : ℕ) + 1) * bernoulli k
+-- :=
+-- begin
+--   apply finset.sum_congr rfl,
+--   intros k hk,
+-- -- next line was written with
+-- --  congr', symmetry, apply nat.cast_sub, library_search,
+--   rw nat.cast_sub (finset.mem_range_succ_iff.mp hk),
+-- end
 
 lemma bernoulli_spec' (n : ℕ) :
   ∑ k in finset.nat.antidiagonal n,
-  (k.1.binomial k.2 : ℚ) / (k.2 + 1) * bernoulli k.1 = 1 :=
+  ((k.1 + k.2).choose k.2 : ℚ) / (k.2 + 1) * bernoulli k.1 = 1 :=
 begin
   convert bernoulli_spec n using 1,
-  rw this_is_so_stupid,
   symmetry,
-  convert sum_range_succ_eq_sum_antidiagonal (λ i j, (i.binomial j : ℚ) / (j + 1) * bernoulli i) n,
+  rw sum_range_succ_eq_sum_antidiagonal (λ i j, ((i + j).choose j : ℚ) / (j + 1) * bernoulli i) n,
+  apply finset.sum_congr rfl,
+  intros k hk, rw mem_range_succ_iff at hk,
+  congr' 3,
+  { rw ← nat.choose_symm_add, congr', exact (nat.add_sub_of_le hk).symm },
+  { norm_cast }
 end
-
-
 
 open_locale nat
 
-lemma what_am_i_doing_wrong (n : ℕ) : ∑ (k : ℕ) in range n.succ, ↑(k.binomial (n.succ - k)) * bernoulli k =
-∑ (k : ℕ) in range n.succ, ↑(k.binomial (n - k).succ) * bernoulli k :=
+lemma what_am_i_doing_wrong (n : ℕ) :
+  ∑ (k : ℕ) in range n.succ, ↑(k.binomial (n.succ - k)) * bernoulli k =
+  ∑ (k : ℕ) in range n.succ, ↑(k.binomial (n - k).succ) * bernoulli k :=
 begin
-  apply finset.sum_congr rfl,
+  apply finset.sum_congr rfl, -- gives us assumption k ≤ n
   intros k hk,
   rw nat.succ_sub (finset.mem_range_succ_iff.mp hk),
 end
 
 open nat
 
-
-
-
 @[simp] lemma sum_bernoulli' (n : ℕ) :
-  ∑ k in finset.range n, (k.binomial (n - k) : ℚ) * bernoulli k = n :=
+  ∑ k in finset.range n, (n.choose k : ℚ) * bernoulli k = n :=
 begin
   -- n = 0 is a special case so let's prove it for n of the form d + 1.
   cases n with d, simp, -- checking special case n = 0 with `simp`
@@ -152,32 +157,41 @@ begin
   -- $$\Sum_{k\leq d}\binom{d+1}k\cdot B_k=\Sum_{k\leq d}(d+1)\binom{d}{x}\frac{B_k}{d+1-k}$$
   rw [← mul_one (d.succ : ℚ), ← bernoulli_spec' d, finset.mul_sum],
   -- change other sum to antidiag
-  rw what_am_i_doing_wrong,
-  rw sum_range_succ_eq_sum_antidiagonal (λ k dmk, (k.binomial dmk.succ : ℚ) * bernoulli k) d,
+  -- rw what_am_i_doing_wrong,
+  rw sum_range_succ_eq_sum_antidiagonal
+  (λ i j, (d.succ : ℚ) * ( (i+j).choose j / (j + 1) * bernoulli i)) d,
   apply finset.sum_congr rfl,
-  rintro ⟨i, j⟩ hd, rw finset.nat.mem_antidiagonal at hd, subst hd, dsimp,
-  -- eliminate bernoulli
+  rintro k hk, rw mem_range_succ_iff at hk, dsimp only,
+  -- eliminate bernoulli,
   rw ← mul_assoc, congr',
-  field_simp [(show (j : ℚ) + 1 ≠ 0, from ne_of_gt (by norm_cast; linarith))],
+  -- clear denoms
+  have h : ((d - k : ℕ) : ℚ) + 1 ≠ 0,
+  { norm_cast, simp },
+  field_simp [h],
+  -- down to nat
   norm_cast,
-  rw succ_mul_binomial',
-  ring,
+  -- introduce i and prove i + k = d
+  set i := d - k with hi,
+  rw ← choose_symm (le_trans hk (le_succ d)),
+  have hi3 : k + i = d := add_sub_of_le hk,
+  rw [← hi3, succ_mul_choose_eq],
+  congr', exact norm_num.sub_nat_pos (k + i).succ k (succ i) rfl,
 end
 
 -- Is this the way to say it?
 -- the "missing term" (n+1).binomial 0 * bernoulli (n+1) is B_{n+1}
 @[simp] lemma sum_bernoulli_antidiag (n : ℕ) :
   (∑ ij in finset.nat.antidiagonal n,
-   (ij.1.binomial ij.2.succ : ℚ) * bernoulli ij.1) = n.succ :=
+   ((ij.1 + ij.2).succ.choose ij.1 : ℚ) * bernoulli ij.1) = n.succ :=
 begin
-  rw ← sum_range_succ_eq_sum_antidiagonal (λ (i j : ℕ) , (i.binomial j.succ : ℚ) * bernoulli i),
+  rw sum_range_succ_eq_sum_antidiagonal (λ (i j : ℕ) , ((i + j).succ.choose i : ℚ) * bernoulli i),
   dsimp,
   convert sum_bernoulli' n.succ using 1,
   apply finset.sum_congr rfl,
-  intros k hk,
-  rw mem_range_succ_iff at hk,
+  intros k hk, rw mem_range_succ_iff at hk,
+  -- remove bernoulli
   congr',
-  exact (nat.succ_sub hk).symm,
+  exact add_sub_of_le hk,
 end
 
 
@@ -206,7 +220,9 @@ begin
 end
 @[simp] lemma bernoulli_four  : bernoulli 4 = -1/30 :=
 begin
-  rw [bernoulli_def, sum_range_succ, sum_range_succ, sum_range_succ, sum_range_one], norm_num,
+  rw [bernoulli_def, sum_range_succ, sum_range_succ, sum_range_succ, sum_range_one],
+  rw (show nat.choose 4 2 = 6, from dec_trivial), -- shrug
+  norm_num,
 end
 
 -- experiments
@@ -228,7 +244,23 @@ begin
   refl,
 end
 
-#check power_series.coeff_mul
+def choose_eq_factorial_div_factorial' {a b : ℕ}
+  (hab : a ≤ b) : (b.choose a : ℚ) = b! / (a! * (b - a)!) :=
+begin
+  field_simp [mul_ne_zero, factorial_ne_zero],
+  norm_cast,
+  rw ← choose_mul_factorial_mul_factorial hab,
+  ring,
+end
+
+#check choose_mul_factorial_mul_factorial
+
+lemma choose_spec {i j : ℕ} : i! * j! * (i + j).choose j = (i + j)! :=
+begin
+  rw ← choose_mul_factorial_mul_factorial (show j ≤ i + j, by simp),
+  simp, ring,
+end
+
 
 theorem bernoulli_power_series :
 (power_series.mk (λ n, bernoulli n / n!) : power_series ℚ) * (power_series.exp ℚ - 1) =
@@ -258,6 +290,6 @@ begin
   rw [mul_comm _ (bernoulli i), mul_assoc, mul_assoc],
   apply congr_arg,
   norm_cast,
-  rw ← binomial_spec,
+  rw ← _root_.choose_spec,
   ring,
 end
