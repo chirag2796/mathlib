@@ -22,18 +22,17 @@ a sequence of rational numbers. They show up in the formula for the the sum
 of the first $n$ `k`th powers, they are related to the Taylor series of
 certain trigonometric and hyperbolic functions, and also show up in the values
 that the Riemann Zeta function takes both at both negative and positive integers.
-For example If $2 \leq k$ is even then
+For example If $1 \leq n$ is even then
 
--- TODO fix rational constant
-
-$$\sum_{n\geq1}n^{-k}=B_k\pi^k.$$
+$$\zeta(2n)=\sum_{t\geq1}t^{-2n}=(-1)^{n+1}\frac{(2\pi)^{2n}B_{2n}}{2(2n)!}.$$
 
 Note however that many of these results are not yet formalised in Lean.
 
-The Bernoulli numbers can be formally defined thus:
+The Bernoulli numbers can be formally defined using the power series
 
--- goal
 $$\sum B_n\frac{t^n}{n!}=\frac{t}{1-e^{-t}}$$
+
+-- TODO : do we have this?
 
 although that happens to not be the definition in mathlib (this is an *implementation
 detail* though, and need not concern the mathematician).
@@ -70,20 +69,21 @@ the $n$-th Bernoulli number $B_n$ is defined recursively via
 $$B_n = 1 - \sum_{k < n} \binom{n}{k}\frac{B_k}{n+1-k}$$ -/
 def bernoulli : ℕ → ℚ :=
 well_founded.fix nat.lt_wf
-  (λ n bernoulli, 1 - ∑ k : fin n, (k : ℕ).binomial (n - k) / (n - k + 1) * bernoulli k k.2)
+  (λ n bernoulli, 1 - ∑ k : fin n, n.choose k / (n - k + 1) * bernoulli k k.2)
 
 lemma bernoulli_def' (n : ℕ) :
-  bernoulli n = 1 - ∑ k : fin n, (k : ℕ).binomial (n - k) / (n - k + 1) * bernoulli k :=
+  bernoulli n = 1 - ∑ k : fin n, n.choose k / (n - k + 1) * bernoulli k :=
 well_founded.fix_eq _ _ _
 
 lemma bernoulli_def (n : ℕ) :
-  bernoulli n = 1 - ∑ k in finset.range n, (k : ℕ).binomial (n - k) / (n - k + 1) * bernoulli k :=
+  bernoulli n = 1 - ∑ k in finset.range n, n.choose k / (n - k + 1) * bernoulli k :=
 by { rw [bernoulli_def', ← fin.sum_univ_eq_sum_range], refl }
 
 lemma bernoulli_spec (n : ℕ) :
-  ∑ k in finset.range n.succ, (k.binomial (n - k) : ℚ) / (n - k + 1) * bernoulli k = 1 :=
+  ∑ k in finset.range n.succ, (n.choose k : ℚ) / (n - k + 1) * bernoulli k = 1 :=
 by simp [finset.sum_range_succ, bernoulli_def n]
 
+#check finset.mem_range
 @[simp] lemma finset.mem_range_succ_iff {a b : ℕ} : a ∈ finset.range b.succ ↔ a ≤ b :=
 by simp only [nat.lt_succ_iff, finset.mem_range]
 
